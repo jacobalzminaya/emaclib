@@ -8,7 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>QUANTUM MACRO | MASTER CONFLUENCE V5.5</title>
     
-    <!-- Chart.js CDN (ligero y rápido) -->
+    <!-- Chart.js CDN para el gráfico de acierto -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
     <style>
@@ -30,7 +30,7 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            padding-bottom: 120px; /* más espacio abajo para nuevos paneles */
+            padding-bottom: 140px; /* espacio extra para paneles nuevos */
             box-sizing: border-box;
         }
 
@@ -129,51 +129,41 @@
             font-size: 12px;
         }
 
-        /* NUEVOS PANELLES DE VISIBILIDAD */
-        #trap-panel, #stats-panel, #log-panel {
+        /* PANELLES DE VISIBILIDAD */
+        .info-panel {
             background: rgba(26,26,26,0.85);
             border-radius: 8px;
             padding: 12px;
             margin: 8px 10px;
             border: 1px solid #444;
             backdrop-filter: blur(8px);
+            font-size: 13px;
         }
 
-        #trap-panel {
-            border-color: #ff9f43;
-        }
-
-        #trap-panel h4 {
-            color: #ff9f43;
+        .info-panel h4 {
             margin: 0 0 8px 0;
             font-size: 14px;
+            font-weight: bold;
         }
 
-        #stats-panel {
-            border-color: #00ff88;
-        }
+        #trap-panel { border-color: #ff9f43; }
+        #trap-panel h4 { color: #ff9f43; }
 
-        #stats-panel h4 {
-            color: #00ff88;
-            margin: 0 0 8px 0;
-            font-size: 14px;
-        }
+        #stats-panel { border-color: #00ff88; }
+        #stats-panel h4 { color: #00ff88; }
 
         #log-panel {
-            max-height: 120px;
+            max-height: 140px;
             overflow-y: auto;
             font-size: 11px;
             color: #aaa;
             border-color: #555;
         }
 
-        .alert {
-            color: #ff2e63;
-            font-weight: bold;
-        }
+        .alert { color: #ff2e63; font-weight: bold; }
 
         #accuracy-chart-container {
-            height: 140px;
+            height: 160px;
             margin: 10px;
             background: rgba(0,0,0,0.3);
             border-radius: 8px;
@@ -222,6 +212,7 @@
 
         @media (max-width: 768px) {
             #macro-grid { grid-template-columns: 1fr; }
+            #bottom-controls { flex-direction: column; }
         }
     </style>
 </head>
@@ -242,8 +233,8 @@
             </div>
         </div>
 
-        <!-- NUEVO: Panel Anti-Trampa -->
-        <div id="trap-panel">
+        <!-- Panel Anti-Trampa -->
+        <div id="trap-panel" class="info-panel">
             <h4>ANTI-TRAMPA STATUS</h4>
             <div>Trampas detectadas: <span id="trap-count">0</span></div>
             <div>Prob. trampa actual: <span id="trap-prob">0%</span></div>
@@ -251,16 +242,15 @@
             <div>Trampas evitadas hoy: <span id="traps-avoided">0</span></div>
         </div>
 
-        <!-- NUEVO: Estadísticas rápidas -->
-        <div id="stats-panel">
+        <!-- Estadísticas rápidas -->
+        <div id="stats-panel" class="info-panel">
             <h4>ESTADÍSTICAS RÁPIDAS</h4>
-            <div>Acierto global: <span id="global-acc">0%</span></div>
+            <div>Acierto global: <span id="global-acc">0.0%</span></div>
             <div>Trades totales: <span id="total-trades">0</span></div>
-            <div>Trades ganados: <span id="wins">0</span></div>
-            <div>Trades perdidos: <span id="losses">0</span></div>
+            <div>Ganados / Perdidos: <span id="wins">0</span> / <span id="losses">0</span></div>
         </div>
 
-        <!-- NUEVO: Gráfico de acierto -->
+        <!-- Gráfico de acierto -->
         <div id="accuracy-chart-container">
             <canvas id="accuracy-chart"></canvas>
         </div>
@@ -292,7 +282,7 @@
         </div>
 
         <!-- Logs visibles -->
-        <div id="log-panel">
+        <div id="log-panel" class="info-panel">
             <strong>ÚLTIMOS LOGS:</strong><br>
             <div id="log-lines"></div>
         </div>
@@ -325,9 +315,12 @@
     <script src="market_bridge_core.js"></script>
     <script src="ui_manager.js"></script>
 
-    <!-- Script para el gráfico de acierto -->
+    <!-- Script para el gráfico y actualización de UI -->
     <script>
         let accChart;
+        let accHistory = [];
+        let trapAvoidedCount = 0;
+
         const accData = {
             labels: [],
             datasets: [{
@@ -356,20 +349,51 @@
             });
         }
 
-        function updateChart(acc) {
+        function updateAccuracyChart(acc) {
             if (!accChart) initChart();
             const now = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            accHistory.push(acc * 100);
             accData.labels.push(now);
             accData.datasets[0].data.push(acc * 100);
-            if (accData.labels.length > 20) {
+            if (accHistory.length > 30) {
+                accHistory.shift();
                 accData.labels.shift();
                 accData.datasets[0].data.shift();
             }
             accChart.update();
         }
 
+        // Funciones de actualización de UI (puedes llamar desde market_bridge_core.js)
+        function updateTrapPanel(trapsCount, currentProb, lastTrapSeq, avoided) {
+            document.getElementById('trap-count').innerText = trapsCount;
+            document.getElementById('trap-prob').innerText = currentProb;
+            document.getElementById('last-trap').innerText = lastTrapSeq || '---';
+            document.getElementById('traps-avoided').innerText = avoided;
+        }
+
+        function updateStatsPanel(acc, total, wins, losses) {
+            document.getElementById('global-acc').innerText = acc.toFixed(1) + '%';
+            document.getElementById('total-trades').innerText = total;
+            document.getElementById('wins').innerText = wins;
+            document.getElementById('losses').innerText = losses;
+        }
+
+        function addLog(msg, color = '#aaa') {
+            const logContainer = document.getElementById('log-lines');
+            const line = document.createElement('div');
+            line.innerHTML = `<span style="color:\( {color}">[ \){new Date().toLocaleTimeString()}] ${msg}</span>`;
+            logContainer.appendChild(line);
+            if (logContainer.children.length > 10) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
         // Inicializar gráfico al cargar
-        window.addEventListener('load', initChart);
+        window.addEventListener('load', () => {
+            initChart();
+            addLog("Sistema iniciado – esperando datos...", "#00ff88");
+        });
     </script>
 </body>
 </html>
