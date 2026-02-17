@@ -8,7 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>QUANTUM MACRO | MASTER CONFLUENCE V5.5</title>
     
-    <!-- Chart.js CDN para el gráfico de acierto -->
+    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
     <style>
@@ -30,7 +30,7 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            padding-bottom: 140px; /* espacio extra para paneles nuevos */
+            padding-bottom: 160px;
             box-sizing: border-box;
         }
 
@@ -66,6 +66,26 @@
             color: #666;
             margin-top: 4px;
         }
+
+        /* NUEVO PANEL: SECUENCIA EN VIVO (CORES INSERTADOS) */
+        #sequence-live-panel {
+            background: rgba(10, 10, 20, 0.9);
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin: 8px 10px;
+            padding: 12px;
+            max-height: 80px;
+            overflow-x: auto;
+            white-space: nowrap;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.15);
+        }
+
+        .seq-a { color: #00ff88; }
+        .seq-b { color: #ff2e63; }
+        #seq-length { font-size: 12px; color: #888; margin-top: 6px; }
 
         #ai-genetic-container {
             background: linear-gradient(90deg, rgba(0,210,255,0.12) 0%, rgba(157,80,187,0.06) 100%);
@@ -129,7 +149,6 @@
             font-size: 12px;
         }
 
-        /* PANELLES DE VISIBILIDAD */
         .info-panel {
             background: rgba(26,26,26,0.85);
             border-radius: 8px;
@@ -233,6 +252,13 @@
             </div>
         </div>
 
+        <!-- NUEVO: Panel para ver los cores/secuencia en vivo -->
+        <div id="sequence-live-panel">
+            <strong>SECUENCIA EN VIVO (CORES INSERTADOS)</strong><br>
+            <div id="live-sequence">---</div>
+            <div id="seq-length">Longitud actual: 0 velas</div>
+        </div>
+
         <!-- Panel Anti-Trampa -->
         <div id="trap-panel" class="info-panel">
             <h4>ANTI-TRAMPA STATUS</h4>
@@ -315,7 +341,7 @@
     <script src="market_bridge_core.js"></script>
     <script src="ui_manager.js"></script>
 
-    <!-- Script para el gráfico y actualización de UI -->
+    <!-- Script para gráfico, logs y actualización de secuencia en vivo -->
     <script>
         let accChart;
         let accHistory = [];
@@ -363,7 +389,21 @@
             accChart.update();
         }
 
-        // Funciones de actualización de UI (puedes llamar desde market_bridge_core.js)
+        // Actualizar secuencia en vivo (cores insertados)
+        function updateLiveSequence() {
+            if (!window.sequence || !document.getElementById('live-sequence')) return;
+
+            const seqDisplay = window.sequence.slice(-40).map(item => {
+                return item.val === 'A' 
+                    ? `<span class="seq-a">A</span>` 
+                    : `<span class="seq-b">B</span>`;
+            }).join(' ');
+
+            document.getElementById('live-sequence').innerHTML = seqDisplay || '---';
+            document.getElementById('seq-length').innerText = `Longitud actual: ${window.sequence.length} velas`;
+        }
+
+        // Funciones de actualización de paneles (llamadas desde market_bridge_core.js)
         function updateTrapPanel(trapsCount, currentProb, lastTrapSeq, avoided) {
             document.getElementById('trap-count').innerText = trapsCount;
             document.getElementById('trap-prob').innerText = currentProb;
@@ -372,7 +412,7 @@
         }
 
         function updateStatsPanel(acc, total, wins, losses) {
-            document.getElementById('global-acc').innerText = acc.toFixed(1) + '%';
+            document.getElementById('global-acc').innerText = (acc * 100).toFixed(1) + '%';
             document.getElementById('total-trades').innerText = total;
             document.getElementById('wins').innerText = wins;
             document.getElementById('losses').innerText = losses;
@@ -389,11 +429,15 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        // Inicializar gráfico al cargar
+        // Inicializar al cargar
         window.addEventListener('load', () => {
             initChart();
             addLog("Sistema iniciado – esperando datos...", "#00ff88");
+            updateLiveSequence(); // Inicial
         });
+
+        // Actualizar secuencia después de cada injectManual (se llama desde JS principal)
+        // Puedes llamar updateLiveSequence() desde market_bridge_core.js después de push a sequence
     </script>
 </body>
 </html>
