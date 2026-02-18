@@ -85,7 +85,7 @@ const MarketBridge = {
         document.addEventListener('contextmenu', e => e.preventDefault());
     },
 
-    injectManual(type) {
+        injectManual(type) {
         console.log(`[INJECT] ${type === 'A' ? 'BUY' : 'SELL'}`);
 
         const priceChange = (type === 'A' ? 0.5 : -0.5) + (Math.random() * 0.2 - 0.1);
@@ -105,6 +105,13 @@ const MarketBridge = {
         window.sequence.push({ val: type, time: Date.now() });
         if (window.sequence.length > 400) window.sequence.shift();
 
+        // ────────────────────────────────────────────────
+        //  ¡ESTA ES LA LÍNEA QUE HACE QUE SE VEA INMEDIATAMENTE!
+        if (typeof updateLiveSequence === 'function') {
+            updateLiveSequence();
+        }
+        // ────────────────────────────────────────────────
+
         if(typeof UIManager !== 'undefined') UIManager.updateVisualTrack(window.sequence);
         
         this.runMultiAnalysis();
@@ -119,7 +126,6 @@ const MarketBridge = {
             this.lastTrainCount = window.sequence.length;
         }
 
-        // Actualizar toda la UI visible después de cada inyección
         this.updateTrapUI();
         this.updateStatsUI();
     },
@@ -740,24 +746,48 @@ const MarketBridge = {
     },
 
     runMultiAnalysis() {
-        const containers = { low: document.getElementById('col-low'), mid: document.getElementById('col-mid'), high: document.getElementById('col-high') };
-        Object.values(containers).forEach(c => { if(c) c.innerHTML = ''; });
-        const history = window.sequence.map(v => v.val).join('');
-        for (let v = 3; v <= 20; v++) {
-            if (window.sequence.length < v) continue;
-            const pattern = history.slice(-v);
-            const searchPool = history.slice(0, -1);
-            const mA = (searchPool.match(new RegExp(pattern + 'A', 'g')) || []).length;
-            const mB = (searchPool.match(new RegExp(pattern + 'B', 'g')) || []).length;
-            let pred = mA > mB ? "BUY" : (mB > mA ? "SELL" : "---");
-            this.predictions[v] = pred;
-            const acc = this.stats[v].total > 0 ? Math.round((this.stats[v].hits / this.stats[v].total) * 100) : 0;
-            const card = `<div class="window-card" style="border-right:3px solid \( {pred==="BUY"?"#00ff88":"#ff2e63"}">V \){v} \( {pred} ( \){acc}%)</div>`;
-            if (acc >= 75) containers.high.innerHTML += card;
-            else if (acc >= 55) containers.mid.innerHTML += card;
-            else if (containers.low) containers.low.innerHTML += card;
-        }
-    },
+    const containers = { 
+        low: document.getElementById('col-low'), 
+        mid: document.getElementById('col-mid'), 
+        high: document.getElementById('col-high') 
+    };
+    
+    Object.values(containers).forEach(c => { if(c) c.innerHTML = ''; });
+    
+    const history = window.sequence.map(v => v.val).join('');
+    
+    for (let v = 3; v <= 20; v++) {
+        if (window.sequence.length < v) continue;
+        
+        const pattern = history.slice(-v);
+        const searchPool = history.slice(0, -1);
+        const mA = (searchPool.match(new RegExp(pattern + 'A', 'g')) || []).length;
+        const mB = (searchPool.match(new RegExp(pattern + 'B', 'g')) || []).length;
+        
+        let pred = mA > mB ? "BUY" : (mB > mA ? "SELL" : "---");
+        this.predictions[v] = pred;
+        
+        const acc = this.stats[v].total > 0 ? Math.round((this.stats[v].hits / this.stats[v].total) * 100) : 0;
+        
+        // Versión VISUAL MEJORADA: fondo completo según tendencia + barra lateral fuerte
+        const card = `
+            <div class="window-card" style="
+                border-right: 4px solid ${pred === "BUY" ? "#00ff88" : (pred === "SELL" ? "#ff2e63" : "#555")};
+                background: ${pred === "BUY" ? "rgba(0, 255, 136, 0.12)" : (pred === "SELL" ? "rgba(255, 46, 99, 0.12)" : "rgba(80,80,80,0.15)")};
+                padding: 8px 10px;
+                border-radius: 6px;
+                margin: 4px 0;
+                color: ${pred === "BUY" ? "#00ff88" : (pred === "SELL" ? "#ff2e63" : "#ccc")};
+            ">
+                V${v} <strong>${pred}</strong> (${acc}%)
+            </div>
+        `;
+        
+        if (acc >= 75) containers.high.innerHTML += card;
+        else if (acc >= 55) containers.mid.innerHTML += card;
+        else if (containers.low) containers.low.innerHTML += card;
+    }
+},
 
     updateLeaderUI(bestV, history) {
         const pred = this.predictions[bestV];
